@@ -1,77 +1,64 @@
 import io
 import os
-import urllib.request
+import re
 from flask import Flask, render_template, request, Response
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
+import yt_dlp
 
 app = Flask(__name__)
-
-def fetch_working_proxy():
-    """Scrapes a fresh, active public proxy to bypass the Render 429 IP ban."""
-    try:
-        # Fetch list of active public proxies (HTTP protocol, 5-second timeout)
-        api_url = "https://proxyscrape.com"
-        response = urllib.request.urlopen(api_url, timeout=5)
-        raw_proxies = response.read().decode('utf-8').strip().split('\n')
-        
-        valid_proxies = [p.strip() for p in raw_proxies if p.strip() and not p.startswith('##')]
-        if valid_proxies:
-            proxy_ip = valid_proxies[0]
-            # Structure the proxy dictionary for pytubefix
-            return {
-                "http": f"http://{proxy_ip}",
-                "https": f"http://{proxy_ip}"
-            }
-    except Exception:
-        pass
-    return None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        video_url = request.form.get("url")
-        if not video_url:
+        media_url = request.form.get("url")
+        if not media_url:
             return "Please provide a valid URL.", 400
 
+        # Validate that the link is a valid SoundCloud URL
+        if not re.search(r'(soundcloud\.com|snd\.sc)', media_url):
+            return "Error: This application currently supports SoundCloud tracks only.", 400
+
         try:
-            # Dynamically fetch a fresh proxy connection route
-            proxy_config = fetch_working_proxy()
-            
-            # Initialize connection passing the proxy along with the WEB client engine
-            if proxy_config:
-                yt = YouTube(video_url, client='WEB', proxies=proxy_config, on_progress_callback=on_progress)
-            else:
-                yt = YouTube(video_url, client='WEB', on_progress_callback=on_progress)
-            
-            # Extract pure high-quality audio stream tracks
-            audio_stream = yt.streams.get_audio_only()
-            if not audio_stream:
-                return "No playable audio stream detected on this video.", 404
-                
-            # Clean up the file name characters for browser attachment
-            clean_title = "".join([c for c in yt.title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
-            filename = f"{clean_title or 'audio'}.mp3"
+            # Configure yt-dlp to stream audio from SoundCloud into server memory
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': '-',  # Directly streams raw chunks to stdout
+                'logtostderr': True,
+                'quiet': True,
+            }
 
-            # Stream the media data strictly into memory buffers
-            buffer = io.BytesIO()
-            audio_stream.stream_to_buffer(buffer)
-            buffer.seek(0)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Extract metadata to fetch the actual song title
+                info = ydl.extract_info(media_url, download=False)
+                clean_title = "".join([c for c in info.get('title', 'audio') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                filename = f"{clean_title or 'track'}.mp3"
 
-            # Generate chunks to pass to standard user download
-            def generate():
-                while True:
-                    chunk = buffer.read(4096)
-                    if not chunk:
-                        break
-                    yield chunk
+                # Instantiate the real-time download into a memory buffer
+                buffer = io.BytesIO()
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl_downloader:
+                    import sys
+                    original_stdout = sys.stdout
+                    sys.stdout = buffer
+                    try:
+                        ydl_downloader.download([media_url])
+                    finally:
+                        sys.stdout = original_stdout
 
-            response = Response(generate(), content_type="audio/mpeg")
-            response.headers["Content-Disposition"] = f"attachment; filename=\"{filename}\""
-            return response
+                buffer.seek(0)
+
+                # Stream the chunks straight to the browser
+                def generate():
+                    while True:
+                        chunk = buffer.read(4096)
+                        if not chunk:
+                            break
+                        yield chunk
+
+                response = Response(generate(), content_type="audio/mpeg")
+                response.headers["Content-Disposition"] = f"attachment; filename=\"{filename}\""
+                return response
 
         except Exception as e:
-            return f"The server is unable to process this video link. Details: <br>{str(e)}", 500
+            return f"The server was unable to process this audio link. Details: <br>{str(e)}", 500
 
     return render_template("index.html")
 
