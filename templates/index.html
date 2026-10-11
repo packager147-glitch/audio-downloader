@@ -3,43 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Audio Hub</title>
+    <title>Audio Downloader</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; background-color: #0f111a; color: #ffffff; display: flex; height: 100vh; overflow: hidden; }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333333; display: flex; height: 100vh; overflow: hidden; }
         
         /* Main intake form section */
-        .main-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; background: linear-gradient(135deg, #141824 0%, #0f111a 100%); }
-        .converter-container { background: #1a1f2c; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); text-align: center; width: 100%; max-width: 500px; border: 1px solid #2d3548; }
-        h2 { font-size: 26px; margin-bottom: 10px; color: #ff5500; letter-spacing: 0.5px; }
-        p { color: #8a96a3; font-size: 14px; margin-bottom: 25px; }
-        input[type="text"] { width: 100%; padding: 14px; margin-bottom: 20px; border: 2px solid #2d3548; border-radius: 6px; background-color: #0f111a; color: #fff; font-size: 15px; outline: none; transition: border-color 0.3s; }
-        input[type="text"]:focus { border-color: #ff5500; }
-        button { background: linear-gradient(90deg, #ff5500 0%, #ff2200 100%); color: white; border: none; padding: 14px 28px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: opacity 0.2s; box-shadow: 0 4px 15px rgba(255, 85, 0, 0.3); }
-        button:hover { opacity: 0.9; }
-        .loading-text { display: none; color: #ff5500; margin-top: 15px; font-weight: bold; font-size: 14px; }
+        .main-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; background-color: #f4f4f9; }
+        .converter-container { background: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; width: 100%; max-width: 500px; border: 1px solid #e0e4ec; }
+        h2 { font-size: 26px; margin-bottom: 10px; color: #007bff; letter-spacing: 0.5px; }
+        p { color: #6c757d; font-size: 14px; margin-bottom: 25px; }
+        input[type="text"] { width: 100%; padding: 14px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; background-color: #ffffff; color: #333; font-size: 15px; outline: none; transition: border-color 0.3s; }
+        input[type="text"]:focus { border-color: #007bff; }
+        button { background-color: #007bff; color: white; border: none; padding: 14px 28px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .loading-text { display: none; color: #007bff; margin-top: 15px; font-weight: bold; font-size: 14px; }
 
         /* Unified Top-To-Bottom Right Sidebar layout */
-        .right-sidebar { width: 360px; background-color: #141824; border-left: 1px solid #2d3548; display: flex; flex-direction: column; height: 100%; }
+        .right-sidebar { width: 360px; background-color: #ffffff; border-left: 1px solid #e0e4ec; display: flex; flex-direction: column; height: 100%; }
         
         /* Music Player block (Top Side) */
-        .player-section { padding: 25px; background: #1a1f2c; border-bottom: 1px solid #2d3548; text-align: center; }
-        .player-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #ff5500; text-transform: uppercase; letter-spacing: 1px; }
-        .now-playing { font-size: 14px; color: #fff; margin-bottom: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+        .player-section { padding: 25px; background: #f8f9fa; border-bottom: 1px solid #e0e4ec; text-align: center; }
+        .player-title { font-size: 15px; font-weight: bold; margin-bottom: 12px; color: #007bff; text-transform: uppercase; letter-spacing: 1px; }
+        .now-playing { font-size: 14px; color: #495057; margin-bottom: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; font-weight: 500; }
         audio { width: 100%; height: 40px; outline: none; border-radius: 30px; }
 
         /* Dynamic Download History List block (Bottom Side) */
         .list-section { flex: 1; padding: 25px; display: flex; flex-direction: column; overflow: hidden; }
-        .list-title { font-size: 15px; font-weight: bold; margin-bottom: 15px; color: #8a96a3; text-transform: uppercase; letter-spacing: 0.5px; }
+        .list-title { font-size: 14px; font-weight: bold; margin-bottom: 15px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
         .download-list { list-style: none; overflow-y: auto; flex: 1; padding-right: 5px; }
         .download-list::-webkit-scrollbar { width: 6px; }
-        .download-list::-webkit-scrollbar-thumb { background-color: #2d3548; border-radius: 4px; }
-        .song-item { background: #1a1f2c; padding: 12px 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #2d3548; cursor: pointer; transition: background 0.2s; }
-        .song-item:hover { background: #242b3d; border-color: #ff5500; }
+        .download-list::-webkit-scrollbar-thumb { background-color: #ced4da; border-radius: 4px; }
+        .song-item { background: #ffffff; padding: 12px 15px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e0e4ec; cursor: pointer; transition: all 0.2s; }
+        .song-item:hover { background: #f8f9fa; border-color: #007bff; }
         .song-info { flex: 1; min-width: 0; padding-right: 10px; }
-        .song-name { font-size: 13.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-        .play-icon { color: #ff5500; font-size: 18px; font-weight: bold; }
-        .empty-state { color: #536271; font-size: 13px; text-align: center; margin-top: 30px; font-style: italic; }
+        .song-name { font-size: 13.5px; color: #333333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .play-icon { color: #007bff; font-size: 16px; font-weight: bold; }
+        .empty-state { color: #adb5bd; font-size: 13px; text-align: center; margin-top: 30px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -71,7 +72,7 @@
         <div class="list-section">
             <div class="list-title">📥 Downloaded Tracks</div>
             <ul class="download-list" id="trackHistoryList">
-                <!-- Javascript will load entries dynamically here -->
+                <!-- Entries loaded dynamically -->
             </ul>
         </div>
         
@@ -85,7 +86,6 @@
         const nowPlayingText = document.getElementById('nowPlayingText');
         const trackHistoryList = document.getElementById('trackHistoryList');
 
-        // Track manager database stored local inside user cache session
         let downloadedTracks = JSON.parse(localStorage.getItem('downloadedTracks')) || [];
 
         function renderHistoryList() {
@@ -110,7 +110,6 @@
 
         function playTrack(name, base64Blob) {
             nowPlayingText.innerText = name;
-            // Convert cached Base64 storage tokens back into a live operational stream URL
             audioPlayer.src = base64Blob;
             audioPlayer.play();
         }
@@ -131,7 +130,6 @@
 
                 if (!response.ok) throw new Error('Network validation block triggered.');
 
-                // Capture binary download file stream payload
                 const contentDisposition = response.headers.get('Content-Disposition');
                 let filename = 'downloaded_audio.mp3';
                 if (contentDisposition && contentDisposition.includes('filename=')) {
@@ -140,22 +138,17 @@
 
                 const blob = await response.blob();
                 
-                // Read streaming buffer straight into client session cache layer
                 const reader = new FileReader();
                 reader.onloadend = function() {
                     const base64data = reader.result;
                     
-                    // Prepend new tracks to the top of the history stack
                     downloadedTracks.unshift({ name: filename, blobData: base64data });
                     localStorage.setItem('downloadedTracks', JSON.stringify(downloadedTracks));
                     renderHistoryList();
-                    
-                    // Instantly drop the fresh download into the upper preview player active deck
                     playTrack(filename, base64data);
                 }
                 reader.readAsDataURL(blob);
 
-                // Execute file save layer to prompt normal native computer directory save
                 const downloadLink = document.createElement('a');
                 downloadLink.href = URL.createObjectURL(blob);
                 downloadLink.download = filename;
@@ -173,7 +166,6 @@
             }
         });
 
-        // Initialize historical view configuration parameters at load time
         renderHistoryList();
     </script>
 </body>
