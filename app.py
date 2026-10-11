@@ -14,10 +14,11 @@ def index():
             return "Please provide a valid URL.", 400
 
         try:
-            # Initialize connection using the modern pytubefix client layout
-            yt = YouTube(video_url, on_progress_callback=on_progress)
+            # Force the initialization to use the 'WEB' client configuration
+            # This triggers pytubefix's internal token generator rules
+            yt = YouTube(video_url, client='WEB', on_progress_callback=on_progress)
             
-            # Extract the raw, high-bitrate audio stream track
+            # Extract the pure audio stream track matching maximum standard quality
             audio_stream = yt.streams.get_audio_only()
             if not audio_stream:
                 return "No playable audio stream detected on this video.", 404
@@ -26,7 +27,7 @@ def index():
             clean_title = "".join([c for c in yt.title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
             filename = f"{clean_title or 'audio'}.mp3"
 
-            # Stream the media track directly into memory to bypass Render storage blocks
+            # Stream the media track directly into memory to bypass local disk tracking
             buffer = io.BytesIO()
             audio_stream.stream_to_buffer(buffer)
             buffer.seek(0)
