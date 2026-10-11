@@ -1,8 +1,26 @@
 import io
+import os
+import sys
+import urllib.request
+import re
 from flask import Flask, render_template, request, send_file
 import yt_dlp
 
 app = Flask(__name__)
+
+def get_free_proxy():
+    """Scrapes a fresh public proxy to bypass YouTube's data center block."""
+    try:
+        url = "https://proxyscrape.com"
+        response = urllib.request.urlopen(url, timeout=5)
+        proxies = response.read().decode('utf-8').strip().split('\n')
+        valid_proxies = [p.strip() for p in proxies if p.strip() and not p.startswith('##')]
+        if valid_proxies:
+            # Return the first available working proxy option
+            return f"http://{valid_proxies[0]}"
+    except Exception:
+        pass
+    return None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -12,40 +30,32 @@ def index():
             return "Please provide a valid URL.", 400
 
         try:
-            # Configure yt-dlp to extract audio in memory without saving a local file
-                        # Configure yt-dlp to bypass bot blocks via mobile client spoofing
+            # Dynamically fetch a fresh proxy connection string
+            proxy_server = get_free_proxy()
+
             ydl_opts = {
                 'format': 'bestaudio/best',
-                'outtmpl': '-',  # Outputs directly to stdout
+                'outtmpl': '-',  
                 'logtostderr': True,
                 'quiet': True,
-                # Force yt-dlp to bypass data center blocks using modern extractor arguments
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['ios', 'android'],
+                        'player_client': ['mweb'],
                         'skip': ['webpage', 'configs'],
                     }
-                },
-                # Adjust HTTP headers to look identical to an Apple iPhone
-                'http_headers': {
-                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)',
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
                 }
             }
 
-
+            # Inject the routing proxy into options if successfully retrieved
+            if proxy_server:
+                ydl_opts['proxy'] = proxy_server
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Extract video metadata first to get the title
                 info = ydl.extract_info(video_url, download=False)
                 filename = f"{info.get('title', 'audio')}.mp3"
 
-                # Download the stream into an in-memory byte buffer
                 buffer = io.BytesIO()
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl_downloader:
-                    # Redirect stdout to our buffer
-                    import sys
                     original_stdout = sys.stdout
                     sys.stdout = buffer
                     try:
@@ -67,4 +77,5 @@ def index():
     return render_template("index.html")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
