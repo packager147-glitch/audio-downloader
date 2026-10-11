@@ -13,14 +13,27 @@ def index():
 
         try:
             # Configure yt-dlp to extract audio in memory without saving a local file
-                        # Configure yt-dlp to extract audio in memory without saving a local file
+                        # Configure yt-dlp to bypass bot blocks via mobile client spoofing
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': '-',  # Outputs directly to stdout
                 'logtostderr': True,
                 'quiet': True,
-                'cookiefile': 'cookies.txt',  # <-- ADD THIS EXACT LINE
+                # Force yt-dlp to bypass data center blocks using modern extractor arguments
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['ios', 'android'],
+                        'skip': ['webpage', 'configs'],
+                    }
+                },
+                # Adjust HTTP headers to look identical to an Apple iPhone
+                'http_headers': {
+                    'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                }
             }
+
 
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
