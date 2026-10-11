@@ -1,15 +1,10 @@
+import io
 import os
-import requests
 from flask import Flask, render_template, request, Response
+from pytubefix import YouTube
+from pytubefix.cli import on_progress
 
 app = Flask(__name__)
-
-# List of distributed, active backup instances to cycle through if one blocks us
-COBALT_INSTANCES = [
-    "https://cobalt.tools",
-    "https://v0.pw",
-    "https://cobalt.lol"
-]
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -18,58 +13,39 @@ def index():
         if not video_url:
             return "Please provide a valid URL.", 400
 
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "url": video_url,
-            "downloadMode": "audio",
-            "audioFormat": "mp3",
-            "audioBitrate": "320"
-        }
-
-        download_url = None
-        error_logs = []
-
-        # Loop through available instances until one successfully parses valid JSON
-        for base_url in COBALT_INSTANCES:
-            try:
-                api_response = requests.post(base_url, json=payload, headers=headers, timeout=10)
-                
-                # Check if the response is actually valid JSON text before decoding it
-                if "application/json" in api_response.headers.get("Content-Type", ""):
-                    json_data = api_response.json()
-                    
-                    if api_response.status_code == 200 and "url" in json_data:
-                        download_url = json_data.get("url")
-                        break
-                    else:
-                        error_logs.append(f"{base_url}: {json_data.get('text', 'Instance Error')}")
-                else:
-                    error_logs.append(f"{base_url}: Returned invalid text/HTML instead of JSON")
-                    
-            except Exception as e:
-                error_logs.append(f"{base_url} failed: {str(e)}")
-
-        # Catch-all validation if every single server in the pool drops the request
-        if not download_url:
-            return f"All processing servers are currently busy. Details: <br>{'<br>'.join(error_logs)}", 503
-
         try:
-            # Stream the confirmed media file back to the user's browser immediately
-            media_stream = requests.get(download_url, stream=True, timeout=30)
+            # Initialize connection using the modern pytubefix client layout
+            yt = YouTube(video_url, on_progress_callback=on_progress)
             
-            response = Response(
-                media_stream.iter_content(chunk_size=4096),
-                content_type="audio/mpeg"
-            )
-            response.headers["Content-Disposition"] = "attachment; filename=audio.mp3"
+            # Extract the raw, high-bitrate audio stream track
+            audio_stream = yt.streams.get_audio_only()
+            if not audio_stream:
+                return "No playable audio stream detected on this video.", 404
+                
+            # Safely generate an attachment file name string
+            clean_title = "".join([c for c in yt.title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+            filename = f"{clean_title or 'audio'}.mp3"
+
+            # Stream the media track directly into memory to bypass Render storage blocks
+            buffer = io.BytesIO()
+            audio_stream.stream_to_buffer(buffer)
+            buffer.seek(0)
+
+            # Generate binary payload to send straight to browser download
+            def generate():
+                while True:
+                    chunk = buffer.read(4096)
+                    if not chunk:
+                        break
+                    yield chunk
+
+            response = Response(generate(), content_type="audio/mpeg")
+            response.headers["Content-Disposition"] = f"attachment; filename=\"{filename}\""
             return response
 
         except Exception as e:
-            return f"Failed to pipe the file down: {str(e)}", 500
+            # Gracefully catch validation failures without a hard crash
+            return f"The server is unable to process this video link. Details: <br>{str(e)}", 500
 
     return render_template("index.html")
 
