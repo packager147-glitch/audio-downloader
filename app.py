@@ -13,12 +13,15 @@ def index():
 
         try:
             # Configure yt-dlp to extract audio in memory without saving a local file
+                        # Configure yt-dlp to extract audio in memory without saving a local file
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': '-',  # Outputs directly to stdout
                 'logtostderr': True,
                 'quiet': True,
+                'cookiefile': 'cookies.txt',  # <-- ADD THIS EXACT LINE
             }
+
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 # Extract video metadata first to get the title
