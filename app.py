@@ -1,26 +1,8 @@
-import io
 import os
-import sys
-import urllib.request
-import re
-from flask import Flask, render_template, request, send_file
-import yt_dlp
+import requests
+from flask import Flask, render_template, request, Response
 
 app = Flask(__name__)
-
-def get_free_proxy():
-    """Scrapes a fresh public proxy to bypass YouTube's data center block."""
-    try:
-        url = "https://proxyscrape.com"
-        response = urllib.request.urlopen(url, timeout=5)
-        proxies = response.read().decode('utf-8').strip().split('\n')
-        valid_proxies = [p.strip() for p in proxies if p.strip() and not p.startswith('##')]
-        if valid_proxies:
-            # Return the first available working proxy option
-            return f"http://{valid_proxies[0]}"
-    except Exception:
-        pass
-    return None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -30,46 +12,40 @@ def index():
             return "Please provide a valid URL.", 400
 
         try:
-            # Dynamically fetch a fresh proxy connection string
-            proxy_server = get_free_proxy()
-
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl': '-',  
-                'logtostderr': True,
-                'quiet': True,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['mweb'],
-                        'skip': ['webpage', 'configs'],
-                    }
-                }
+            # Route requests through a reliable, dedicated media processing instance
+            cobalt_url = "https://cobalt.tools"
+            
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
             }
-
-            # Inject the routing proxy into options if successfully retrieved
-            if proxy_server:
-                ydl_opts['proxy'] = proxy_server
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-                filename = f"{info.get('title', 'audio')}.mp3"
-
-                buffer = io.BytesIO()
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl_downloader:
-                    original_stdout = sys.stdout
-                    sys.stdout = buffer
-                    try:
-                        ydl_downloader.download([video_url])
-                    finally:
-                        sys.stdout = original_stdout
-
-                buffer.seek(0)
-                return send_file(
-                    buffer,
-                    mimetype="audio/mpeg",
-                    as_attachment=True,
-                    download_name=filename
-                )
+            
+            payload = {
+                "url": video_url,
+                "downloadMode": "audio",
+                "audioFormat": "mp3",
+                "audioBitrate": "320"
+            }
+            
+            # Request processing from Cobalt instance
+            api_response = requests.post(cobalt_url, json=payload, headers=headers, timeout=15)
+            
+            if api_response.status_code != 200:
+                return f"Processing failed: {api_response.json().get('text', 'Unknown server challenge')}", 400
+                
+            download_url = api_response.json().get("url")
+            if not download_url:
+                return "Could not extract direct stream URL.", 500
+                
+            # Direct binary stream retrieval to avoid local storage caching
+            media_stream = requests.get(download_url, stream=True, timeout=30)
+            
+            response = Response(
+                media_stream.iter_content(chunk_size=4096),
+                content_type="audio/mpeg"
+            )
+            response.headers["Content-Disposition"] = "attachment; filename=audio.mp3"
+            return response
 
         except Exception as e:
             return f"An error occurred: {str(e)}", 500
